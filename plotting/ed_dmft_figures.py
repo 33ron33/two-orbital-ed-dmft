@@ -1,48 +1,27 @@
 #!/usr/bin/env python3
 """
-plot_ed_dmft_all.py
+Plotting utilities for two-orbital Kanamori ED-DMFT calculations.
 
-Comprehensive plotting/diagnostic script for two-orbital Kanamori ED-DMFT NPZ files.
+The script reads NumPy archives written by the ED-DMFT solver and produces
+diagnostic plots, scalar summaries, and phase-analysis figures.  It can be used
+for quick checks of a single run or for plotting completed parameter scans.
 
-Works for two use cases:
+Typical scan groups are:
 
-  1) Smoke test / single-point diagnostics
-     - Loads one or more ED_*.npz files from --data/--smoke_dir.
-     - Makes quick dashboard plots: G(iw), Sigma(iw), observables, bath parameters.
-     - Optionally parses a log file and plots convergence history.
+  validation
+      noninteracting or small test calculations
 
-  2) Production paper figures
-     - Figure 1: U=J=0 Green's-function validation against analytic Bethe result.
-     - Figure 2: Scan A, J=0 Mott transition: Z and D vs U, metal/insulator branches.
-     - Figure 3: Scan C, Z1/Z2 vs U for several J/U values.
-     - Figure 4: Self-energy inside OSMT, default U=3, J/U=0.10.
-     - Figure 5: Scan B, D1/D2/D12 vs J/U at fixed U.
-     - Figure 6: Scan C, (U,J/U) phase diagram.
-     - Figure 7: Scan D, (U,T) phase diagram plus Z(U) at lowest T.
+  scan A
+      degenerate-band J=0 interaction sweep
 
-The script is intentionally robust: if a figure's data are missing, it skips that
-figure instead of crashing. It also writes all loaded scalar observables to CSV.
+  scan B
+      fixed-U Hund-coupling sweep
 
-Example smoke test:
+  scan C
+      interaction and Hund-ratio scan for unequal bandwidths
 
-  python plot_ed_dmft_all.py \
-      --mode smoke \
-      --data smoke_ED \
-      --logs logs/smoke_ED.log \
-      --out figs_smoke \
-      --nb 2 --beta 8 --t2 1.0
-
-Example production:
-
-  python plot_ed_dmft_all.py \
-      --mode production \
-      --scanA /lustre/.../data/scanA \
-      --scanB /lustre/.../data/scanB \
-      --scanC /lustre/.../data/scanC \
-      --scanD /lustre/.../data/scanD \
-      --out figures_prod \
-      --nb 2 --beta 25 --t2A 1.0 --t2B 1.0 --t2C 0.5 --t2D 0.5 \
-      --z_thresh 0.05
+  scan D
+      interaction and temperature scan at fixed Hund ratio
 """
 
 from __future__ import annotations
@@ -434,10 +413,7 @@ class IterLog:
 
 
 def parse_log_file(path: str) -> Optional[IterLog]:
-    """Parse solver/ed_solver_dmft.py logs robustly.
-
-    The previous single-regex parser could miss dSigma_rms because the field was
-    optional. Here each quantity is extracted independently from the same line.
+    """Extract iteration diagnostics from an ED-DMFT solver log.
     """
     p = Path(path).expanduser()
     if not p.exists():
@@ -628,7 +604,7 @@ def plot_smoke_dashboard(records: Sequence[EDRecord], outdir: Path, nfreq: int =
     savefig(fig, outdir, "smoke_dashboard")
 
 
-def fig1_green_validation(records: Sequence[EDRecord], outdir: Path, beta: Optional[float], t2: Optional[float], nb: Optional[int]) -> None:
+def plot_green_function_validation(records: Sequence[EDRecord], outdir: Path, beta: Optional[float], t2: Optional[float], nb: Optional[int]) -> None:
     cand = [r for r in records if approx(r.U, 0.0, 1e-8) and approx(r.J, 0.0, 1e-8)]
     if beta is not None:
         cand = [r for r in cand if approx(r.beta, beta, 1e-6)]
@@ -638,7 +614,7 @@ def fig1_green_validation(records: Sequence[EDRecord], outdir: Path, beta: Optio
         cand = [r for r in cand if r.nb == nb]
     cand = best_by_grid(cand)
     if not cand:
-        print("[skip] Figure 1: no U=J=0 file found")
+        print("[skip] green-function validation: no U=J=0 file found")
         return
     r = cand[0]
     omega, sl_all = pos_freq(r)
@@ -672,16 +648,16 @@ def fig1_green_validation(records: Sequence[EDRecord], outdir: Path, beta: Optio
     ax.set_title(r"Self-energy vanishes")
     ax.legend(frameon=False, fontsize=7)
     fig.tight_layout()
-    savefig(fig, outdir, "fig1_green_validation")
+    savefig(fig, outdir, "plot_green_function_validation")
 
 
-def fig2_mott_scan_A(records: Sequence[EDRecord], outdir: Path, beta: float, t2: float, nb: Optional[int]) -> None:
+def plot_degenerate_mott_scan(records: Sequence[EDRecord], outdir: Path, beta: float, t2: float, nb: Optional[int]) -> None:
     rec = [r for r in records if approx(r.beta, beta, 1e-6) and approx(r.t2, t2, 1e-6) and approx(r.J, 0.0, 1e-6)]
     if nb is not None:
         rec = [r for r in rec if r.nb == nb]
     rec = best_by_grid(rec)
     if len(rec) < 2:
-        print("[skip] Figure 2: not enough Scan A J=0 records")
+        print("[skip] degenerate Mott scan: not enough J=0 records")
         return
 
     fig, axes = plt.subplots(1, 2, figsize=(6.75, 2.8))
@@ -702,7 +678,7 @@ def fig2_mott_scan_A(records: Sequence[EDRecord], outdir: Path, beta: float, t2:
     axes[1].set_ylabel(r"$D=\langle n_\uparrow n_\downarrow\rangle$")
     axes[1].legend(frameon=False)
     fig.tight_layout()
-    savefig(fig, outdir, "fig2_scanA_Z_D_vs_U")
+    savefig(fig, outdir, "degenerate_mott_hysteresis")
 
 
 def unique_rounded(vals: Iterable[float], ndigits: int = 3) -> List[float]:
@@ -710,13 +686,13 @@ def unique_rounded(vals: Iterable[float], ndigits: int = 3) -> List[float]:
     return out
 
 
-def fig3_Z_vs_U_scan_C(records: Sequence[EDRecord], outdir: Path, beta: float, t2: float, nb: Optional[int]) -> None:
+def plot_orbital_differentiation_scan(records: Sequence[EDRecord], outdir: Path, beta: float, t2: float, nb: Optional[int]) -> None:
     rec = [r for r in records if r.branch == "MET" and approx(r.beta, beta, 1e-6) and approx(r.t2, t2, 1e-6)]
     if nb is not None:
         rec = [r for r in rec if r.nb == nb]
     rec = best_by_grid(rec)
     if len(rec) < 3:
-        print("[skip] Figure 3: not enough Scan C records")
+        print("[skip] orbital differentiation scan: not enough records")
         return
 
     jrs = unique_rounded([r.Jr for r in rec], 3)
@@ -738,7 +714,7 @@ def fig3_Z_vs_U_scan_C(records: Sequence[EDRecord], outdir: Path, beta: float, t
     axes[1].set_title(r"narrow orbital, $Z_2$")
     axes[1].legend(frameon=False, fontsize=7)
     fig.tight_layout()
-    savefig(fig, outdir, "fig3_scanC_Z_vs_U_by_Jratio")
+    savefig(fig, outdir, "orbital_differentiation_Z_vs_U")
 
 
 def nearest_record(records: Sequence[EDRecord], U: float, Jr: float, beta: float, t2: float, nb: Optional[int], branch: str = "MET") -> Optional[EDRecord]:
@@ -750,10 +726,10 @@ def nearest_record(records: Sequence[EDRecord], U: float, Jr: float, beta: float
     return min(cand, key=lambda r: abs(r.U - U) + 5.0 * abs(r.Jr - Jr))
 
 
-def fig4_self_energy_osmt(records: Sequence[EDRecord], outdir: Path, beta: float, t2: float, nb: Optional[int], U_osmt: float, Jr_osmt: float) -> None:
+def plot_osmt_frequency_response(records: Sequence[EDRecord], outdir: Path, beta: float, t2: float, nb: Optional[int], U_osmt: float, Jr_osmt: float) -> None:
     r = nearest_record(records, U_osmt, Jr_osmt, beta, t2, nb, branch="MET")
     if r is None:
-        print("[skip] Figure 4: no OSMT candidate record")
+        print("[skip] OSMT frequency response: no candidate record")
         return
     omega, sl_all = pos_freq(r)
     nshow = min(80, len(omega))
@@ -776,17 +752,17 @@ def fig4_self_energy_osmt(records: Sequence[EDRecord], outdir: Path, beta: float
     ax.set_ylabel(r"$-\mathrm{Im}\,G_m(i\omega_n)$")
     ax.legend(frameon=False)
     fig.tight_layout()
-    savefig(fig, outdir, "fig4_self_energy_osmt")
+    savefig(fig, outdir, "plot_osmt_frequency_response")
 
 
-def fig5_hund_docc_scan_B(records: Sequence[EDRecord], outdir: Path, beta: float, t2: float, nb: Optional[int], U_fixed: float) -> None:
+def plot_hund_double_occupancy_scan(records: Sequence[EDRecord], outdir: Path, beta: float, t2: float, nb: Optional[int], U_fixed: float) -> None:
     rec = [r for r in records if r.branch == "MET" and approx(r.beta, beta, 1e-6) and approx(r.t2, t2, 1e-6) and approx(r.U, U_fixed, 1e-6)]
     if nb is not None:
         rec = [r for r in rec if r.nb == nb]
     rec = best_by_grid(rec)
     rec = sorted(rec, key=lambda x: x.Jr)
     if len(rec) < 2:
-        print("[skip] Figure 5: not enough Scan B records")
+        print("[skip] Hund double-occupancy scan: not enough records")
         return
 
     Jr = np.array([r.Jr for r in rec])
@@ -811,7 +787,7 @@ def fig5_hund_docc_scan_B(records: Sequence[EDRecord], outdir: Path, beta: float
     h2, l2 = ax2.get_legend_handles_labels()
     ax.legend(h1 + h2, l1 + l2, frameon=False, loc="best")
     fig.tight_layout()
-    savefig(fig, outdir, "fig5_scanB_D_vs_Jratio")
+    savefig(fig, outdir, "hund_double_occupancy_scan")
 
 
 def classify_phase(Z1: float, Z2: float, z_thresh: float) -> int:
@@ -832,13 +808,13 @@ def phase_cmap_norm():
     return cmap, norm
 
 
-def fig6_phase_diagram_U_J(records: Sequence[EDRecord], outdir: Path, beta: float, t2: float, nb: Optional[int], z_thresh: float) -> None:
+def plot_interaction_hund_phase_map(records: Sequence[EDRecord], outdir: Path, beta: float, t2: float, nb: Optional[int], z_thresh: float) -> None:
     rec = [r for r in records if r.branch == "MET" and approx(r.beta, beta, 1e-6) and approx(r.t2, t2, 1e-6)]
     if nb is not None:
         rec = [r for r in rec if r.nb == nb]
     rec = best_by_grid(rec)
     if len(rec) < 3:
-        print("[skip] Figure 6: not enough Scan C records")
+        print("[skip] U-J/U phase map: not enough records")
         return
 
     U = np.array([r.U for r in rec])
@@ -860,16 +836,16 @@ def fig6_phase_diagram_U_J(records: Sequence[EDRecord], outdir: Path, beta: floa
     ]
     ax.legend(handles=handles, frameon=False, loc="upper left")
     fig.tight_layout()
-    savefig(fig, outdir, "fig6_scanC_U_J_phase_diagram")
+    savefig(fig, outdir, "interaction_hund_phase_map")
 
 
-def fig7_phase_diagram_U_T(records: Sequence[EDRecord], outdir: Path, t2: float, nb: Optional[int], Jr_target: float, z_thresh: float) -> None:
+def plot_interaction_temperature_phase_map(records: Sequence[EDRecord], outdir: Path, t2: float, nb: Optional[int], Jr_target: float, z_thresh: float) -> None:
     rec = [r for r in records if r.branch == "MET" and approx(r.t2, t2, 1e-6) and approx(round(r.Jr, 3), Jr_target, 2e-3)]
     if nb is not None:
         rec = [r for r in rec if r.nb == nb]
     rec = best_by_grid(rec)
     if len(rec) < 3:
-        print("[skip] Figure 7: not enough Scan D records")
+        print("[skip] U-T phase map: not enough records")
         return
 
     phase = np.array([classify_phase(r.Z1, r.Z2, z_thresh) for r in rec])
@@ -900,7 +876,7 @@ def fig7_phase_diagram_U_T(records: Sequence[EDRecord], outdir: Path, t2: float,
     ax.set_title(fr"lowest $T$: $\beta={max_beta:g}$")
     ax.legend(frameon=False)
     fig.tight_layout()
-    savefig(fig, outdir, "fig7_scanD_U_T_phase_diagram")
+    savefig(fig, outdir, "interaction_temperature_phase_map")
 
 
 # -----------------------------------------------------------------------------
@@ -947,7 +923,7 @@ def plot_convergence_quality(records: Sequence[EDRecord], outdir: Path) -> None:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Plot ED-DMFT smoke diagnostics and production figures.")
+    p = argparse.ArgumentParser(description="Plot ED-DMFT diagnostics and phase-analysis figures.")
     p.add_argument("--mode", choices=["smoke", "production", "all"], default="all")
     p.add_argument("--data", nargs="*", default=[], help="Generic data directories/files/globs; used for smoke or all.")
     p.add_argument("--scanA", nargs="*", default=[], help="Scan A dirs/files: J=0 degenerate U sweep.")
@@ -1005,13 +981,13 @@ def main() -> int:
         C = scanC if scanC else all_records
         D = scanD if scanD else all_records
 
-        fig1_green_validation(all_records, outdir, beta=args.beta if args.beta else None, t2=args.t2, nb=args.nb)
-        fig2_mott_scan_A(A, outdir, beta=args.beta, t2=args.t2A, nb=args.nb)
-        fig3_Z_vs_U_scan_C(C, outdir, beta=args.beta, t2=args.t2C, nb=args.nb)
-        fig4_self_energy_osmt(C, outdir, beta=args.beta, t2=args.t2C, nb=args.nb, U_osmt=args.U_osmt, Jr_osmt=args.Jr_osmt)
-        fig5_hund_docc_scan_B(B, outdir, beta=args.beta, t2=args.t2B, nb=args.nb, U_fixed=args.U_hund)
-        fig6_phase_diagram_U_J(C, outdir, beta=args.beta, t2=args.t2C, nb=args.nb, z_thresh=args.z_thresh)
-        fig7_phase_diagram_U_T(D, outdir, t2=args.t2D, nb=args.nb, Jr_target=args.Jr_D, z_thresh=args.z_thresh)
+        plot_green_function_validation(all_records, outdir, beta=args.beta if args.beta else None, t2=args.t2, nb=args.nb)
+        plot_degenerate_mott_scan(A, outdir, beta=args.beta, t2=args.t2A, nb=args.nb)
+        plot_orbital_differentiation_scan(C, outdir, beta=args.beta, t2=args.t2C, nb=args.nb)
+        plot_osmt_frequency_response(C, outdir, beta=args.beta, t2=args.t2C, nb=args.nb, U_osmt=args.U_osmt, Jr_osmt=args.Jr_osmt)
+        plot_hund_double_occupancy_scan(B, outdir, beta=args.beta, t2=args.t2B, nb=args.nb, U_fixed=args.U_hund)
+        plot_interaction_hund_phase_map(C, outdir, beta=args.beta, t2=args.t2C, nb=args.nb, z_thresh=args.z_thresh)
+        plot_interaction_temperature_phase_map(D, outdir, t2=args.t2D, nb=args.nb, Jr_target=args.Jr_D, z_thresh=args.z_thresh)
 
     print("\nDone. Generated figures in:", outdir.resolve())
     return 0
