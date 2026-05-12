@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Logs / runtime
+logs/
+*.log
+*.out
+*.err
+nohup.out
+
+# Data outputs
+data/**/*.npz
+data/**/*.npy
+data/**/*.h5
+data/**/*.hdf5
+!data/README.md
+
+# Generated figures
+figures/**/*.png
+figures/**/*.pdf
+figures/**/*.csv
+!figures/README.md
+!figures/final/
+!figures/final/*.pdf
+!figures/final/*.png
+!figures/final/*.csv
+
+# Generated joblists
+joblists/*.commands
+joblists/nb*_chunk_*.commands
+!joblists/README.md
