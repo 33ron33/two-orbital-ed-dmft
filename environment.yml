@@ -1,4 +1,4 @@
-name: ed_pyed
+name: ed_dmft
 channels:
   - conda-forge
 dependencies:
