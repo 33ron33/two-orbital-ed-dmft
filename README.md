@@ -13,7 +13,7 @@ The project focuses on:
 ## Main solver
 
 ```bash
-python solver/cluster_dmft_ed_updated.py \
+python solver/ed_solver_dmft.py \
   --U 4.0 \
   --J 0.0 \
   --beta 25 \
@@ -138,7 +138,7 @@ After creating the environment, run:
 ```bash
 mkdir -p data/smoke_env_test logs
 
-python solver/cluster_dmft_ed_updated.py \
+python solver/ed_solver_dmft.py \
   --U 0.0 \
   --J 0.0 \
   --beta 25 \

@@ -434,7 +434,7 @@ class IterLog:
 
 
 def parse_log_file(path: str) -> Optional[IterLog]:
-    """Parse cluster_dmft_ed_updated.py logs robustly.
+    """Parse solver/ed_solver_dmft.py logs robustly.
 
     The previous single-regex parser could miss dSigma_rms because the field was
     optional. Here each quantity is extracted independently from the same line.

@@ -16,7 +16,7 @@ U_GRID = [0.50, 1.00, 1.50, 2.00, 2.50, 3.00, 3.50, 4.00, 4.50, 5.00, 5.50, 6.00
 JR_GRID = [0.10, 0.20, 0.30]
 
 BASE = [
-    PYTHON, "cluster_dmft_ed_updated.py",
+    PYTHON, "solver/ed_solver_dmft.py",
     "--beta", "25",
     "--t1", "1.0",
     "--t2", "0.3",

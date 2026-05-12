@@ -1,25 +1,14 @@
 #!/usr/bin/env python3
 """
-cluster_dmft_ed_updated.py
+Single-point ED-DMFT solver for the two-orbital Hubbard-Kanamori model.
 
-Single-point two-orbital Kanamori ED-DMFT for a Bethe lattice.
-Designed for cluster/SLURM sweeps where each job runs one (U, J, seed) point.
+The lattice problem is treated on the Bethe lattice and mapped to a finite-bath
+Anderson impurity model. The impurity problem is solved by exact diagonalization,
+and the bath is updated using the Bethe-lattice self-consistency condition.
 
-Main fixes compared with the earlier script:
-  1. Correct half-filled Kanamori chemical potential in Weiss/Dyson:
-        G0^{-1}(iw) = iw + mu_H - Delta(iw)
-        G0^{-1,new}(iw) = iw + mu_H - t_m^2 G_m(iw)
-     where mu_H = (3U - 5J)/2.
-  2. Real DMFT stabilization by mixing fitted bath parameters, not only Sigma.
-  3. Optional particle-hole-symmetric bath fitting for half-filled ED.
-  4. Better convergence metric: RMS change of low-frequency Sigma.
-  5. Default exit code is 0 even if not converged, so SLURM scans do not mark
-     saved-but-unconverged points as failed. Use --fail_on_nonconvergence if needed.
-
-Usage example:
-  python cluster_dmft_ed_updated.py --U 5.0 --J 0.75 --beta 25 \
-      --t1 1.0 --t2 0.5 --Nb 2 --seed metal --ph_sym_bath \
-      --outdir data/results
+The script is intended for parameter scans in which each process evaluates one
+(U, J, beta, seed) point and writes a compact NumPy archive with observables,
+Matsubara Green's functions, self-energies, and final bath parameters.
 """
 
 import argparse
@@ -32,8 +21,9 @@ import warnings
 import numpy as np
 from scipy.optimize import minimize
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOCAL_PYED = os.path.join(PROJECT_DIR, "pyed")
+SOLVER_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(SOLVER_DIR)
+LOCAL_PYED = os.path.join(REPO_ROOT, "pyed")
 if os.path.isdir(os.path.join(LOCAL_PYED, "pyed")) and LOCAL_PYED not in sys.path:
     sys.path.insert(0, LOCAL_PYED)
 
@@ -47,9 +37,7 @@ np.random.seed(os.getpid() % (2**31))
 UP, DN = 0, 1
 
 
-# -----------------------------------------------------------------------------
 # Basic helpers
-# -----------------------------------------------------------------------------
 
 def kanamori_mu_half_filling(U, J):
     """Two-orbital Kanamori chemical potential at half filling."""
@@ -87,9 +75,7 @@ def make_gf_like(mesh):
     return Gf(mesh=mesh, target_shape=[1, 1])
 
 
-# -----------------------------------------------------------------------------
-# Hamiltonian and ED impurity solve
-# -----------------------------------------------------------------------------
+# Hamiltonian and impurity solve
 
 def build_kanamori_aim(U, J, eps_bath, V_bath):
     """
@@ -132,7 +118,7 @@ def build_kanamori_aim(U, J, eps_bath, V_bath):
     H += -J * (c_dag(UP, 0) * c(DN, 0) * c_dag(DN, 1) * c(UP, 1))
     H += -J * (c_dag(UP, 1) * c(DN, 1) * c_dag(DN, 0) * c(UP, 0))
 
-    # Pair-hopping terms. Keep the same sign convention as the original script.
+    # Pair-hopping terms in the Kanamori convention used throughout this work.
     H += J * (c_dag(UP, 0) * c_dag(DN, 0) * c(DN, 1) * c(UP, 1))
     H += J * (c_dag(UP, 1) * c_dag(DN, 1) * c(DN, 0) * c(UP, 0))
 
@@ -192,8 +178,7 @@ def ed_solve_2orb(U, J, eps_bath, V_bath, beta, n_iw):
             V_bath[m] ** 2 / (iw[:, None] - eps_bath[m][None, :]), axis=1
         )
 
-        # Important correction: because H contains -mu_H*n_imp,
-        # the noninteracting Weiss inverse is iw + mu_H - Delta(iw).
+        # Since H contains -mu_H*n_imp, the Weiss inverse is iw + mu_H - Delta(iw).
         G0inv = iw + mu_H - hyb
 
         g0 = make_gf_like(mesh)
@@ -208,9 +193,7 @@ def ed_solve_2orb(U, J, eps_bath, V_bath, beta, n_iw):
     return G_iw, Sig_iw, G0_iw, D1, D2, D12, occ1, occ2
 
 
-# -----------------------------------------------------------------------------
-# ED bath fitting and Bethe update
-# -----------------------------------------------------------------------------
+# Bath fitting and Bethe update
 
 def _hyb_from_bath(iw, eps, V):
     return np.sum(V**2 / (iw[:, None] - eps[None, :]), axis=1)
@@ -399,9 +382,7 @@ def bethe_update_G0(G_iw, U, J, t_orb=1.0):
     return g0
 
 
-# -----------------------------------------------------------------------------
 # Observables and convergence
-# -----------------------------------------------------------------------------
 
 def quasiparticle_Z(Sigma_iw, beta):
     """Eliashberg estimate Z = 1/[1 - Im Sigma(iw0)/w0]."""
@@ -457,9 +438,7 @@ def initialize_bath(U, t1, t2, N_b, seed='metal', ph_sym=False):
     return eps_bath, V_bath
 
 
-# -----------------------------------------------------------------------------
 # DMFT loop
-# -----------------------------------------------------------------------------
 
 def run_dmft_2orb(
     U,
@@ -611,9 +590,7 @@ def run_dmft_2orb(
     }
 
 
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
+# Command-line interface
 
 def main():
     parser = argparse.ArgumentParser(
