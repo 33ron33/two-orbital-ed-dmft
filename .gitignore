@@ -6,31 +6,32 @@ __pycache__/
 # macOS
 .DS_Store
 
-# Logs / runtime
+# Logs and runtime output
 logs/
 *.log
 *.out
 *.err
 nohup.out
 
-# Data outputs
-data/**/*.npz
-data/**/*.npy
-data/**/*.h5
-data/**/*.hdf5
-!data/README.md
+# Raw/generated data
+data/
+*.npz
+*.npy
+*.h5
+*.hdf5
+
+# Generated job command lists
+joblists/
+*.commands
 
 # Generated figures
 figures/**/*.png
 figures/**/*.pdf
 figures/**/*.csv
-!figures/README.md
+
+# Keep selected final figures
 !figures/final/
 !figures/final/*.pdf
 !figures/final/*.png
 !figures/final/*.csv
-
-# Generated joblists
-joblists/*.commands
-joblists/nb*_chunk_*.commands
-!joblists/README.md
+!figures/final/.gitkeep
