@@ -1,0 +1,16 @@
+COPYING.txt
+LICENSE.txt
+setup.py
+pyed/CubeTetras.py
+pyed/GfUtils.py
+pyed/OperatorUtils.py
+pyed/ParameterCollection.py
+pyed/SparseExactDiagonalization.py
+pyed/SparseMatrixFockStates.py
+pyed/SquareTriangles.py
+pyed/TriqsExactDiagonalization.py
+pyed/__init__.py
+pyed.egg-info/PKG-INFO
+pyed.egg-info/SOURCES.txt
+pyed.egg-info/dependency_links.txt
+pyed.egg-info/top_level.txt

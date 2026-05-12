@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: pyed
+Version: 0.0.0
+Home-page: https://github.com/HugoStrand/pyed
+Author: Hugo U.R. Strand
+License: GPL3
+License-File: LICENSE.txt
+License-File: COPYING.txt
+Dynamic: author
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
