@@ -117,7 +117,7 @@ def run_beta_branch(beta):
             prev = find_previous_seed(U, beta)
 
         cmd = [
-            PYTHON, "cluster_dmft_ed_updated.py",
+            PYTHON, "solver/ed_solver_dmft.py",
             "--beta", f"{beta:.1f}",
             "--U", f"{U:.6f}",
             "--J", f"{J:.6f}",
