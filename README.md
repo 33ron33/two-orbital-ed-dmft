@@ -146,7 +146,6 @@ The solver writes NumPy archives containing:
 
 This repository is distributed under the GNU General Public License v3.0.
 
-The included `pyed/` directory carries its own GPL license files. Those terms apply to that directory.# Two-Orbital Kanamori ED-DMFT
+The included `pyed/` directory carries its own GPL license files. Those terms apply to that directory.
 
-This repository contains an exact-diagonalization dynamical mean-field theory implementation for the two-orbital Hubbard-Kanamori model on the Bethe lattice.
 
